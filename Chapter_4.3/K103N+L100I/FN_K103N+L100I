@@ -1,0 +1,13 @@
+PFRMAT FN
+TARGET K103NL100I
+AUTHOR IntFOLD7
+METHOD IntFOLD7-FN: FunFOLD4 is used to parse the output from IntFOLD7-TS and ModFOLD8 to identify templates with significant ligands: Roche, D. B., Tetchner, S. J. & McGuffin, L. J. (2011) FunFOLD: an improved automated method for the prediction of ligand binding residues using 3D models of proteins. BMC Bioinformatics, 12, 160.
+MODEL 1
+Binding site: 95, 100, 101, 103, 106, 108, 179, 181, 187, 188, 189, 190, 227, 228, 229, 230, 234, 235, 236, 318; 443
+Comment: Most likely ligands at each site (Type): T27; DC
+Comment: Centroid ligands at each site (TypeID): 5MA561; MG571
+Comment: All ligands in clusters (Type-Frequency): R8E-1, M9A-1, T90-1, T27-3, 7N1-1, 5MA-1, NVP-1; DDG-1, MG-9, 1RY-1, QID-1, DG-13, BA5-1, DC-17, DA-2, Y55-1, DT-7, RU-10, MN-8, ON1-1, G47-1
+Comment: Likely+centroid ligands at each site: T27577; DC587
+Comment: EC numbers: 3.4.23.16;2.7.7.49;2.7.7.7;3.1.26.13;3.1.13.2;3.1.26.4;
+Comment: GO terms: 0003676;0003723;0003964;0004523;0006278;
+END
