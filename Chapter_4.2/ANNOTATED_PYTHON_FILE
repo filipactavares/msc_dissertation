@@ -1,0 +1,160 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 27 14:31:11 2023
+
+@author: Filipa Tavares
+"""
+
+#LOAD INTO THE CORRECT DIRECTORY#
+
+import os
+os.chdir("C:\\Users\\Utilizador\\Documents\\tese\\UMaps")
+os.getcwd()
+
+
+#IMPORT REQUIRED PACKAGES#
+
+import pandas as pd
+import scanpy as sc
+import seaborn as sns
+
+
+#INSTALL, IMPORT, CONFIGURE AND LOAD DATA INTO AN ADATA OBJECT# 
+
+# Set verbosity level of scanpy to 3. Level 3 means that scanpy will also show 'hint' messages.
+sc.settings.verbosity = 3
+
+# Set some figure parameters for scanpy. Specifically, set the resolution of rendered figures to 150 DPI and the face color of figures to white.
+sc.settings.set_figure_params(dpi=150, facecolor="white")
+
+# Print a header with information about scanpy, such as its version number.
+sc.logging.print_header()
+
+# Import data
+df = pd.read_csv('all_just_mutations.csv', index_col=0) #CSV file with just 0/1 representing the presence/absence, respectivelly, of all mutations in question, and the correspondent sequence ID
+df_all = pd.read_csv('all.csv',index_col=0, dtype = str) #CSV file with presence/absence of each mutation in question, and laboratory and personal information about each patient, as well as the correspondent sequence ID
+
+# Load data into an AnnData object
+adata = sc.AnnData(df.astype('float32'))
+adata
+
+adata_all = sc.AnnData(df_all.astype('float32'))
+adata_all
+
+
+#UMAP/LOUVAIN USING SCANPY#
+
+#This code is calling the neighbors function from scanpy.pp module. 
+#The neighbors function computes a neighborhood graph of observations. 
+#For example, it can be called with three arguments: adata, which represents the input data; n_neighbors=15, which specifies that 15 neighboring data points should be used for manifold approximation; and n_pcs=6, which specifies that 6 PCs should be used.
+#The choice of n_neighbors depends on your data and analysis goals. 
+#A larger value of n_neighbors will result in more global views of the manifold, while smaller values will preserve more local data. You can try different values of n_neighbors and see how it affects your downstream analysis.
+
+sc.pp.neighbors(adata, n_neighbors=600, use_rep='X') #Run this on 132 dimensions of `.X` - if you really want this, set `use_rep='X'`. (in this case, 132 dimensions is representative of the different 132 mutations in study)
+
+
+# Compute a UMAP (Uniform Manifold Approximation and Projection) embedding of the data stored in 'adata'.
+# Set the following parameters for UMAP:
+# - 'alpha' controls the level of exponential decay for the graph weights. Set it to 0.3.
+# - 'min_dist' controls how tightly UMAP is allowed to pack points together. 
+# (Smaller values of min_dist will result in a more clustered/clumped embedding where nearby points on the manifold are drawn closer together, while larger values will result on a more even dispersal of points.)
+# - 'random_state' controls the seed used by the random number generator. Set it to 0.
+
+sc.tl.umap(adata, alpha = 0.3, min_dist = 1, random_state = 0)
+
+# Cluster the data stored in 'adata' into subgroups using the Louvain algorithm
+# Set the resolution parameter, where a higher value means finding more and smaller clusters. You can try different values of resolution and see how it affects the size and number of clusters according to the plot given in the next step.
+
+sc.tl.louvain(adata, resolution=0.75)
+
+# Given the UMAP embedding of the data, produce a scatter plot annotated/coloured by the Louvain clustering results
+# Set the following parameters:
+# - wspace adjusts the width of the space between multiple panels. Set it to 0.5.
+# - ncols sets the number of panels per row. Set it to 2.
+# - size determines the point size of each data point. Set it to 50.
+
+sc.pl.umap(adata, color=["louvain"], wspace=0.5, ncols=2, size=[50])
+
+# Colour the UMAP visualization with the laboratory and personal patient data
+
+# Save each variable you want to represent in the UMAP visualization as a panda categorical data in the adata object
+
+subtype=df_all['SUBTIPO']
+adata.obs["subtype"] = pd.Categorical(subtype)  # Categoricals are preferred for efficiency
+
+art=df_all['ARV(2)']
+adata.obs["ART"] = pd.Categorical(art)
+
+treatment=df_all['TREATMENT']
+adata.obs["treatment"] = pd.Categorical(treatment)
+
+sex=df_all['SEXO']
+adata.obs["sex"] = pd.Categorical(sex)
+
+age=df_all['IDADE_N']
+adata.obs["age"] = pd.Categorical(age)
+
+years=df_all['YEARS_TREATMENT']
+adata.obs["years_treatment"] = pd.Categorical(years)
+
+sample_year = df_all["SAMPLE_YEAR"]
+adata.obs["sample_year"] = pd.Categorical(sample_year)
+
+
+# Colour the UMAP visualization of the data given the categorical variables chosen
+
+sc.pl.umap(adata, color=['subtype'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['ART'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['treatment'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['sex'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['age'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['years_treatment'], wspace=0.5, ncols=2, size=[50])
+sc.pl.umap(adata, color=['sample_year'], wspace=0.5, ncols=2, size=[50])
+
+#CONSTRUCTING MUTATION HEATMAP#
+
+# Rank mutations that characterize each cluster
+# The willcoxon method uses Willcoxon rank-sum, which is often described as the non-parametric version of the two-sample t-test
+# The n_genes parameter sets the number of genes (in this case, mutations) that appear in the returned tables.
+
+sc.tl.rank_genes_groups(adata,'louvain', method = 'wilcoxon', n_genes=50)
+adata.uns["rank_genes_groups"] # adding this new variable in the shape of a dataframe to the adata object
+
+ 
+# Calculate mean expression value for each variable
+mean_expression = adata.X.mean(axis=0)
+
+# Set threshold for filtering low-value variables
+threshold = 0.005
+
+# Create list of variable names with mean expression above threshold
+high_value_var_names = adata.var_names[mean_expression > threshold]
+
+# Plot heatmap with filtered variable names
+sc.tl.dendrogram(adata,n_pcs=5,groupby=['louvain'])
+sc.pl.heatmap(adata, var_names=high_value_var_names, groupby='louvain', show_gene_labels=True, cmap='viridis', dendrogram=True)
+
+
+#CONSTRUCTING VIOLIN_PLOTS#
+
+# Build violin plots given some laboratory variables available
+
+cd4lou = pd.read_csv('louvain_CD4.csv', index_col=0) #this CSV file contains each sequence ID with its correspondent CD4+ cell count and to which Louvain cluster it belongs to
+
+table = pd.DataFrame(cd4lou) #transform the table in the CSV file into a workable panda dataframe
+print(table)
+
+sns.violinplot(data=table, x="louvain", y=table[table["CD4+"]<1500]["CD4+"])
+#a threshold was given as there were many outlier values that were making the visualization of the data a hard task
+#the specific 1500 value was because a normal patient without HIV-1 infection can have between 500 and 1500 cell/mm^3, with a count of less than 200 cell/mm^3 indicating AIDS
+
+
+cVlou = pd.read_csv('louvain_CV.csv', index_col=0) #this CSV file contains each sequence ID with its correspondent viral load and to which Louvain cluster it belongs to
+
+table_CV = pd.DataFrame(cVlou)
+print(table_CV)
+
+sns.violinplot(data=table_CV, x="louvain", y=table_CV[table_CV["VIRAL LOAD"]<100000]["VIRAL LOAD"])
+#a threshold was given as there were many outlier values that were making the visualization of the data a hard task
+#the specific 100.000 value was because a high HIV viral load is generally considered above 100,000 copies per milliliter of blood, with the normal range being between 10.000 and 100.000
+
